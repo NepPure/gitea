@@ -13,13 +13,13 @@ import (
 	"code.gitea.io/gitea/modules/context"
 	"code.gitea.io/gitea/modules/markup/markdown"
 	"code.gitea.io/gitea/modules/setting"
+	"code.gitea.io/gitea/modules/timeutil"
 	"code.gitea.io/gitea/modules/util"
 )
 
 const (
 	tplMilestone       base.TplName = "repo/issue/milestones"
 	tplMilestoneNew    base.TplName = "repo/issue/milestone_new"
-	tplMilestoneEdit   base.TplName = "repo/issue/milestone_edit"
 	tplMilestoneIssues base.TplName = "repo/issue/milestone_issues"
 )
 
@@ -57,7 +57,7 @@ func Milestones(ctx *context.Context) {
 		return
 	}
 	if ctx.Repo.Repository.IsTimetrackerEnabled() {
-		if miles.LoadTotalTrackedTimes(); err != nil {
+		if err := miles.LoadTotalTrackedTimes(); err != nil {
 			ctx.ServerError("LoadTotalTrackedTimes", err)
 			return
 		}
@@ -88,7 +88,6 @@ func NewMilestone(ctx *context.Context) {
 	ctx.Data["Title"] = ctx.Tr("repo.milestones.new")
 	ctx.Data["PageIsIssueList"] = true
 	ctx.Data["PageIsMilestones"] = true
-	ctx.Data["RequireDatetimepicker"] = true
 	ctx.Data["DateLang"] = setting.DateLang(ctx.Locale.Language())
 	ctx.HTML(200, tplMilestoneNew)
 }
@@ -98,7 +97,6 @@ func NewMilestonePost(ctx *context.Context, form auth.CreateMilestoneForm) {
 	ctx.Data["Title"] = ctx.Tr("repo.milestones.new")
 	ctx.Data["PageIsIssueList"] = true
 	ctx.Data["PageIsMilestones"] = true
-	ctx.Data["RequireDatetimepicker"] = true
 	ctx.Data["DateLang"] = setting.DateLang(ctx.Locale.Language())
 
 	if ctx.HasError() {
@@ -121,7 +119,7 @@ func NewMilestonePost(ctx *context.Context, form auth.CreateMilestoneForm) {
 		RepoID:       ctx.Repo.Repository.ID,
 		Name:         form.Title,
 		Content:      form.Content,
-		DeadlineUnix: util.TimeStamp(deadline.Unix()),
+		DeadlineUnix: timeutil.TimeStamp(deadline.Unix()),
 	}); err != nil {
 		ctx.ServerError("NewMilestone", err)
 		return
@@ -136,7 +134,6 @@ func EditMilestone(ctx *context.Context) {
 	ctx.Data["Title"] = ctx.Tr("repo.milestones.edit")
 	ctx.Data["PageIsMilestones"] = true
 	ctx.Data["PageIsEditMilestone"] = true
-	ctx.Data["RequireDatetimepicker"] = true
 	ctx.Data["DateLang"] = setting.DateLang(ctx.Locale.Language())
 
 	m, err := models.GetMilestoneByRepoID(ctx.Repo.Repository.ID, ctx.ParamsInt64(":id"))
@@ -161,7 +158,6 @@ func EditMilestonePost(ctx *context.Context, form auth.CreateMilestoneForm) {
 	ctx.Data["Title"] = ctx.Tr("repo.milestones.edit")
 	ctx.Data["PageIsMilestones"] = true
 	ctx.Data["PageIsEditMilestone"] = true
-	ctx.Data["RequireDatetimepicker"] = true
 	ctx.Data["DateLang"] = setting.DateLang(ctx.Locale.Language())
 
 	if ctx.HasError() {
@@ -191,8 +187,8 @@ func EditMilestonePost(ctx *context.Context, form auth.CreateMilestoneForm) {
 	}
 	m.Name = form.Title
 	m.Content = form.Content
-	m.DeadlineUnix = util.TimeStamp(deadline.Unix())
-	if err = models.UpdateMilestone(m); err != nil {
+	m.DeadlineUnix = timeutil.TimeStamp(deadline.Unix())
+	if err = models.UpdateMilestone(m, m.IsClosed); err != nil {
 		ctx.ServerError("UpdateMilestone", err)
 		return
 	}
@@ -224,7 +220,7 @@ func ChangeMilestonStatus(ctx *context.Context) {
 		ctx.Redirect(ctx.Repo.RepoLink + "/milestones?state=open")
 	case "close":
 		if !m.IsClosed {
-			m.ClosedDateUnix = util.TimeStampNow()
+			m.ClosedDateUnix = timeutil.TimeStampNow()
 			if err = models.ChangeMilestoneStatus(m, true); err != nil {
 				ctx.ServerError("ChangeMilestoneStatus", err)
 				return
@@ -254,6 +250,11 @@ func MilestoneIssuesAndPulls(ctx *context.Context) {
 	milestoneID := ctx.ParamsInt64(":id")
 	milestone, err := models.GetMilestoneByID(milestoneID)
 	if err != nil {
+		if models.IsErrMilestoneNotExist(err) {
+			ctx.NotFound("GetMilestoneByID", err)
+			return
+		}
+
 		ctx.ServerError("GetMilestoneByID", err)
 		return
 	}
@@ -263,13 +264,8 @@ func MilestoneIssuesAndPulls(ctx *context.Context) {
 
 	issues(ctx, milestoneID, util.OptionalBoolNone)
 
-	perm, err := models.GetUserRepoPermission(ctx.Repo.Repository, ctx.User)
-	if err != nil {
-		ctx.ServerError("GetUserRepoPermission", err)
-		return
-	}
-	ctx.Data["CanWriteIssues"] = perm.CanWriteIssuesOrPulls(false)
-	ctx.Data["CanWritePulls"] = perm.CanWriteIssuesOrPulls(true)
+	ctx.Data["CanWriteIssues"] = ctx.Repo.CanWriteIssuesOrPulls(false)
+	ctx.Data["CanWritePulls"] = ctx.Repo.CanWriteIssuesOrPulls(true)
 
 	ctx.HTML(200, tplMilestoneIssues)
 }

@@ -10,6 +10,7 @@ import "time"
 // Issue is a standard issue information
 type Issue struct {
 	Number      int64
+	PosterID    int64
 	PosterName  string
 	PosterEmail string
 	Title       string
@@ -18,7 +19,8 @@ type Issue struct {
 	State       string // closed, open
 	IsLocked    bool
 	Created     time.Time
+	Updated     time.Time
 	Closed      *time.Time
 	Labels      []*Label
-	Reactions   *Reactions
+	Reactions   []*Reaction
 }

@@ -24,12 +24,9 @@ func listenReadAndClose(t *testing.T, l net.Listener, expected string) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, expected, string(written))
-	return
 }
 
 func TestConnLogger(t *testing.T) {
-	var written []byte
-
 	protocol := "tcp"
 	address := ":3099"
 
@@ -79,8 +76,6 @@ func TestConnLogger(t *testing.T) {
 		assert.NoError(t, err)
 	}()
 	wg.Wait()
-
-	written = written[:0]
 
 	event.level = WARN
 	expected = fmt.Sprintf("%s%s %s:%d:%s [%c] %s\n", prefix, dateString, event.filename, event.line, event.caller, strings.ToUpper(event.level.String())[0], event.msg)
@@ -157,8 +152,6 @@ func TestConnLoggerFailConnect(t *testing.T) {
 }
 
 func TestConnLoggerClose(t *testing.T) {
-	var written []byte
-
 	protocol := "tcp"
 	address := ":3099"
 
@@ -217,8 +210,6 @@ func TestConnLoggerClose(t *testing.T) {
 	assert.Equal(t, flags, connLogger.Flags)
 	assert.Equal(t, level, connLogger.Level)
 	assert.Equal(t, level, logger.GetLevel())
-
-	written = written[:0]
 
 	event.level = WARN
 	expected = fmt.Sprintf("%s%s %s:%d:%s [%c] %s\n", prefix, dateString, event.filename, event.line, event.caller, strings.ToUpper(event.level.String())[0], event.msg)

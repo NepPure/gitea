@@ -1,3 +1,7 @@
+// Copyright 2020 The Gitea Authors. All rights reserved.
+// Use of this source code is governed by a MIT-style
+// license that can be found in the LICENSE file.
+
 package user
 
 import (
@@ -13,7 +17,7 @@ func getWhoamiOutput() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return strings.TrimSpace(string(output[:])), nil
+	return strings.TrimSpace(string(output)), nil
 }
 
 func TestCurrentUsername(t *testing.T) {
